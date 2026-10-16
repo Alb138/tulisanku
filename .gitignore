@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.ipynb_checkpoints/
+
+# Data and outputs are rebuilt by scripts or stored as Kaggle Datasets, not in git
+data/
+outputs/
+checkpoints/
+*.npz
+*.pt
+
+# Course documents and other people's work stay out of the public repo
+*.docx
+*.pdf
