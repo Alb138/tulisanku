@@ -21,12 +21,20 @@ tulisanku/              Python package (reusable code)
   charset.py            the 62 characters we generate (0-9, A-Z, a-z)
   google_fonts.py       find and download fonts from the Google Fonts repo
   render.py             turn a font into baseline-aligned glyph images
-  cleaning.py           rules for removing symbol, tiny-letter and duplicate fonts
+  cleaning.py           rules for removing symbol, faint and duplicate fonts
+  nist.py               NIST SD19: label join, scan cleaning, baseline rebuilding
+  template.py           layout of the printable handwriting sheet
+  download.py           parallel, resumable downloader (the NIST server is slow)
 scripts/
   build_font_dataset.py Google Fonts -> fonts_<size>.npz / .csv / preview
   clean_font_dataset.py decide which fonts to keep -> fonts_<size>_quality.csv + contact sheets
+  download_nist.py      NIST SD19 by_write.zip (by_class.zip is fetched the same way)
+  build_nist_dataset.py NIST -> nist_<size>.npz (images + mask) / .csv / preview
+  make_template_sheet.py templates/tulisanku_sheet.pdf
+templates/
+  tulisanku_sheet.pdf   print at 100% scale, one per writer
 notebooks/
-  01_build_font_dataset.ipynb   builds and cleans the dataset on Kaggle
+  01_build_font_dataset.ipynb   builds and cleans the font dataset on Kaggle (fallback)
 ```
 
 ## Running

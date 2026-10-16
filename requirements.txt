@@ -4,5 +4,6 @@ fonttools
 tqdm
 matplotlib
 pandas
+scipy
 torch
 torchvision
