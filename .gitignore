@@ -14,3 +14,6 @@ checkpoints/
 # Course documents and other people's work stay out of the public repo
 *.docx
 *.pdf
+
+# ...except the printable handwriting sheet, which is part of the project
+!templates/*.pdf
