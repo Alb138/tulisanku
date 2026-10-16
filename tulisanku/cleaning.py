@@ -6,11 +6,15 @@ reversible, and can be reported.
 
 Rules, in order of priority:
   1. symbol font   - not letters at all (barcodes, placeholder blocks, math symbols)
-  2. tiny letters  - one huge swash or very wide letter shrank the whole font
+  2. faint letters - strokes so thin that at this resolution they become pale gray
   3. duplicate     - near-identical to another font (e.g. Noto Sans vs. Noto Sans
                      Devanagari share the same Latin letters); keeping both would
                      leak the same style into train and test
 Caps-only fonts (lowercase drawn as capitals) are only flagged, not removed.
+
+Note: an earlier version removed fonts with a low median glyph height. That
+measured proportions, not quality - it also removed clear casual handwriting with
+tall loops and deep descenders. "Solid ink" measures the actual problem (faintness).
 """
 import re
 
@@ -27,6 +31,11 @@ SYMBOL_FONTS = re.compile(
 
 def is_symbol_font(family: str) -> bool:
     return bool(SYMBOL_FONTS.match(family))
+
+
+def solid_ink(images: np.ndarray) -> np.ndarray:
+    """Share of pixels that are clearly ink (> 50% intensity), per font."""
+    return (images > 128).mean(axis=(1, 2, 3))
 
 
 def caps_only(images: np.ndarray, tolerance: float = 0.01) -> np.ndarray:
@@ -57,15 +66,16 @@ def near_duplicate_pairs(images: np.ndarray, threshold: float) -> list:
     return sorted(zip(i.tolist(), j.tolist(), similarity[i, j].tolist()), key=lambda p: -p[2])
 
 
-def removal_reasons(families: list, heights: np.ndarray, images: np.ndarray,
-                    min_height: float = 0.40, dup_threshold: float = 0.98):
+def removal_reasons(families: list, images: np.ndarray,
+                    min_ink: float = 0.015, dup_threshold: float = 0.98):
     """Return (reasons, duplicate_pairs); reasons[i] is "" if font i is kept."""
     reasons = [""] * len(families)
+    ink = solid_ink(images)
     for i, family in enumerate(families):
         if is_symbol_font(family):
             reasons[i] = "symbol font"
-        elif heights[i] < min_height:
-            reasons[i] = "tiny letters"
+        elif ink[i] < min_ink:
+            reasons[i] = "faint letters"
 
     pairs = near_duplicate_pairs(images, dup_threshold)
     for i, j, _ in pairs:  # most similar pairs first; keep the earlier font, drop the later

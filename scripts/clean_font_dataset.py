@@ -16,14 +16,14 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from tulisanku.cleaning import caps_only, contact_sheet, removal_reasons  # noqa: E402
+from tulisanku.cleaning import caps_only, contact_sheet, removal_reasons, solid_ink  # noqa: E402
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--data-dir", type=Path, default=Path("data/processed"))
     parser.add_argument("--size", type=int, default=64)
-    parser.add_argument("--min-height", type=float, default=0.40)
+    parser.add_argument("--min-ink", type=float, default=0.015, help="remove fonts with less solid ink")
     parser.add_argument("--dup-threshold", type=float, default=0.98)
     args = parser.parse_args()
 
@@ -32,8 +32,8 @@ def main():
     meta = pd.read_csv(f"{stem}.csv")
 
     meta["caps_only"] = caps_only(images)
-    reasons, pairs = removal_reasons(meta["family"].tolist(), meta["median_glyph_height"].to_numpy(),
-                                     images, args.min_height, args.dup_threshold)
+    meta["solid_ink"] = solid_ink(images).round(4)
+    reasons, pairs = removal_reasons(meta["family"].tolist(), images, args.min_ink, args.dup_threshold)
     meta["reason"] = reasons
     meta.to_csv(f"{stem}_quality.csv", index=False)
 
