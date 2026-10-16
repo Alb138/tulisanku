@@ -77,7 +77,9 @@ def main():
     parser.add_argument("--size", type=int, default=64, help="image size in pixels")
     parser.add_argument("--categories", nargs="*", default=None,
                         help="e.g. HANDWRITING SERIF (default: all categories)")
-    parser.add_argument("--limit", type=int, default=None, help="only use the first N families (for testing)")
+    parser.add_argument("--limit", type=int, default=None, help="only use N random families (for testing)")
+    parser.add_argument("--families", nargs="*", default=None,
+                        help='only these family names, e.g. "Caveat" "Flow Block" (for testing)')
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--workers", type=int, default=os.cpu_count())
     args = parser.parse_args()
@@ -88,6 +90,9 @@ def main():
     if args.categories:
         wanted = {c.upper() for c in args.categories}
         families = [f for f in families if wanted & set(f.categories)]
+    if args.families:
+        names = {n.lower() for n in args.families}
+        families = [f for f in families if f.name.lower() in names]
     if args.limit:
         families = random.Random(args.seed).sample(families, min(args.limit, len(families)))
     print(f"Selected {len(families)} Latin font families")

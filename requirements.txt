@@ -3,3 +3,4 @@ pillow
 fonttools
 tqdm
 matplotlib
+pandas

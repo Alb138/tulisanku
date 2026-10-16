@@ -21,10 +21,12 @@ tulisanku/              Python package (reusable code)
   charset.py            the 62 characters we generate (0-9, A-Z, a-z)
   google_fonts.py       find and download fonts from the Google Fonts repo
   render.py             turn a font into baseline-aligned glyph images
+  cleaning.py           rules for removing symbol, tiny-letter and duplicate fonts
 scripts/
   build_font_dataset.py Google Fonts -> fonts_<size>.npz / .csv / preview
+  clean_font_dataset.py decide which fonts to keep -> fonts_<size>_quality.csv + contact sheets
 notebooks/
-  01_build_font_dataset.ipynb   runs the dataset build on Kaggle
+  01_build_font_dataset.ipynb   builds and cleans the dataset on Kaggle
 ```
 
 ## Running

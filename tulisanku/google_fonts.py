@@ -82,9 +82,18 @@ def list_families(repo_dir: Path) -> list:
     return families
 
 
+# Chinese/Japanese/Korean fonts are very large files and their Latin letters are
+# usually borrowed from generic designs, so they are not worth downloading.
+CJK_SCRIPTS = {"Jpan", "Kore", "Hans", "Hant", "Hani", "Hira", "Kana"}
+
+
 def is_latin(family: FontFamily) -> bool:
-    """Keep families made for the Latin alphabet (skip e.g. Japanese, Arabic)."""
-    return "latin" in family.subsets and not family.primary_script
+    """Keep families that include Latin letters (skip fonts without them, and CJK fonts).
+
+    Fonts whose main script is e.g. Devanagari or Thai often also contain Latin
+    letters, so we keep them; near-duplicates among them are removed in cleaning.
+    """
+    return "latin" in family.subsets and family.primary_script not in CJK_SCRIPTS
 
 
 def _git(repo_dir: Path, *args, stdin: str = None):
