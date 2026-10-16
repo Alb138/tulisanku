@@ -31,13 +31,17 @@ notebooks/
 
 ## Running
 
-Heavy steps (dataset building, training) run on **Kaggle notebooks**, which clone this repo.
-To try things locally:
+Developed and trained locally on an RTX 3050 Laptop GPU (4 GB); the Kaggle notebook in
+`notebooks/` is a fallback for larger runs.
 
 ```bash
 python -m venv .venv
+# GPU build of PyTorch first (CUDA 12.8 wheels), then the rest
+.venv/Scripts/python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
 .venv/Scripts/python -m pip install -r requirements.txt   # Windows; use .venv/bin/python on Linux/macOS
-.venv/Scripts/python scripts/build_font_dataset.py --categories HANDWRITING --limit 24
+
+.venv/Scripts/python scripts/build_font_dataset.py          # ~1 GB of fonts -> data/processed/fonts_64.*
+.venv/Scripts/python scripts/clean_font_dataset.py          # -> fonts_64_quality.csv + contact sheets
 ```
 
 ## Data and licenses
