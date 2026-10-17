@@ -8,9 +8,10 @@ const pad = $("pad"), ctx = pad.getContext("2d");
 let chars = "", index = 0, session = null, strokes = [], current = null;
 const drawn = {};                    // char -> {png, strokes}, kept so "Back" can restore a drawing
 
+// Neutral wording on purpose: an earlier "small letter a" made people write lowercase letters tiny.
 function describe(c) {
   if (/[0-9]/.test(c)) return "digit";
-  return c === c.toUpperCase() ? "capital letter" : "small letter";
+  return c === c.toUpperCase() ? "uppercase" : "lowercase";
 }
 
 function paint(target, withGuide) {
