@@ -31,8 +31,10 @@ scripts/
   download_nist.py      NIST SD19 by_write.zip (by_class.zip is fetched the same way)
   build_nist_dataset.py NIST -> nist_<size>.npz (images + mask) / .csv / preview
   make_template_sheet.py templates/tulisanku_sheet.pdf
+collect/
+  app.py                handwriting collection page (Flask): draw each character on a phone
 templates/
-  tulisanku_sheet.pdf   print at 100% scale, one per writer
+  tulisanku_sheet.pdf   printable alternative to the collection page
 notebooks/
   01_build_font_dataset.ipynb   builds and cleans the font dataset on Kaggle (fallback)
 ```
@@ -51,6 +53,15 @@ python -m venv .venv
 .venv/Scripts/python scripts/build_font_dataset.py          # ~1 GB of fonts -> data/processed/fonts_64.*
 .venv/Scripts/python scripts/clean_font_dataset.py          # -> fonts_64_quality.csv + contact sheets
 ```
+
+## Collecting handwriting
+
+```bash
+.venv/Scripts/python collect/app.py   # prints an address to open on phones on the same Wi-Fi
+```
+
+Each character is saved as it is drawn to `data/raw/handwriting/drawn/<session>/` (image + pen strokes).
+Data stays on the laptop running the server and is never committed.
 
 ## Data and licenses
 

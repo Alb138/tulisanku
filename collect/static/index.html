@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>TULISANKU · Handwriting</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main>
+    <section id="intro">
+      <h1>TULISANKU</h1>
+      <p class="lead">Help us teach an AI your handwriting. You'll write each letter and digit once
+        (62 characters, about 5 minutes).</p>
+      <fieldset>
+        <legend>What will you write with?</legend>
+        <label><input type="radio" name="device" value="stylus"> Stylus / pen</label>
+        <label><input type="radio" name="device" value="finger"> Finger</label>
+        <label><input type="radio" name="device" value="mouse"> Mouse</label>
+      </fieldset>
+      <label class="consent"><input type="checkbox" id="consent">
+        I agree that my drawings are used by the TULISANKU student project (COMP6826001 Deep Learning,
+        BINUS University) to train and test AI models. My name is not collected. The drawings stay with
+        the project team, are not published, and can be deleted on request using my session code.</label>
+      <button id="start" disabled>Start</button>
+    </section>
+
+    <section id="draw" hidden>
+      <div class="top">
+        <span id="progress"></span>
+        <span id="hint"></span>
+      </div>
+      <p class="prompt">Write <strong id="char"></strong> resting on the line, as you normally would.</p>
+      <canvas id="pad" width="512" height="512"></canvas>
+      <div class="buttons">
+        <button id="back" class="secondary">Back</button>
+        <button id="undo" class="secondary">Undo</button>
+        <button id="clear" class="secondary">Clear</button>
+        <button id="next">Next</button>
+      </div>
+      <p id="status"></p>
+    </section>
+
+    <section id="done" hidden>
+      <h1>Thank you!</h1>
+      <p>Your session code is <strong id="code"></strong>. Keep it if you ever want your drawings deleted.</p>
+      <div id="gallery"></div>
+    </section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>
