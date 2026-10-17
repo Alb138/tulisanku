@@ -11,16 +11,24 @@ saved the moment it is drawn, so nothing is lost if the browser closes:
 Files are named by character code (61 = "a", 41 = "A") because Windows treats
 "a.png" and "A.png" as the same file name.
 
-Run:   python collect/app.py           -> address for phones on the same Wi-Fi
-       python collect/app.py --share   -> public https link (needs cloudflared, see README)
+Ways to run it:
+  python collect/app.py           -> address for phones on the same Wi-Fi
+  python collect/app.py --share   -> temporary public link through a Cloudflare tunnel
+  hosted (e.g. PythonAnywhere)    -> permanent public link, see collect/DEPLOY.md
 
-With --share, Cloudflare forwards visitors through an outgoing "tunnel" from this
-laptop, so no router or firewall changes are needed. The laptop must stay on while
-people use the link, and the link changes every time the page is restarted.
+Hosting services start the app themselves through WSGI (the standard way a Python web
+app talks to a web server) by importing `app` from this file.
+
+Exporting: if the environment variable TULISANKU_EXPORT_KEY is set, GET
+/api/export?key=<that key> returns every session as one zip file (used by
+scripts/fetch_collected.py). The key is a secret - it never goes into git.
 """
 import argparse
 import base64
+import hmac
+import io
 import json
+import os
 import re
 import shutil
 import socket
@@ -28,18 +36,18 @@ import subprocess
 import sys
 import threading
 import uuid
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from flask import Flask, abort, jsonify, request, send_from_directory
-from waitress import serve
+from flask import Flask, abort, jsonify, request, send_file, send_from_directory
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from tulisanku.charset import CHARSET  # noqa: E402
 
 STATIC = Path(__file__).parent / "static"
-OUT = ROOT / "data" / "raw" / "handwriting" / "drawn"
+OUT = Path(os.environ.get("TULISANKU_DATA_DIR", ROOT / "data" / "raw" / "handwriting" / "drawn"))
 DEVICES = {"finger", "stylus", "mouse", "other"}
 PNG_PREFIX = "data:image/png;base64,"
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -107,6 +115,25 @@ def save_glyph():
     return jsonify(ok=True)
 
 
+@app.get("/api/export")
+def export():
+    """All sessions as one zip - only for whoever knows the secret export key."""
+    key = os.environ.get("TULISANKU_EXPORT_KEY", "")
+    if not key:
+        abort(404)  # exporting is switched off unless a key is configured
+    if not hmac.compare_digest(request.args.get("key", ""), key):  # constant-time comparison
+        abort(403)
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        if OUT.exists():
+            for path in sorted(OUT.rglob("*")):
+                if path.is_file():
+                    archive.write(path, path.relative_to(OUT).as_posix())
+    buffer.seek(0)
+    return send_file(buffer, mimetype="application/zip", as_attachment=True,
+                     download_name="tulisanku_handwriting.zip")
+
+
 def lan_address() -> str:
     """This laptop's address on the local network (what phones should open)."""
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
@@ -150,6 +177,7 @@ if __name__ == "__main__":
     print(f"\n  On this laptop:          http://localhost:{args.port}")
     print(f"  On phones (same Wi-Fi):  http://{lan_address()}:{args.port}\n", flush=True)
     tunnel = start_tunnel(args.port) if args.share else None
+    from waitress import serve  # only needed when running it yourself, not on a hosting service
     try:
         serve(app, host="0.0.0.0", port=args.port)  # waitress: a production server, unlike app.run()
     finally:

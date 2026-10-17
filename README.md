@@ -56,9 +56,13 @@ python -m venv .venv
 
 ## Collecting handwriting
 
+The page is hosted on PythonAnywhere for a permanent link - see [collect/DEPLOY.md](collect/DEPLOY.md)
+(setup, monthly renewal, and `scripts/fetch_collected.py` to download the drawings). It can also run
+from a laptop:
+
 ```bash
 .venv/Scripts/python collect/app.py           # address for phones on the same Wi-Fi
-.venv/Scripts/python collect/app.py --share   # public https link, usable from anywhere
+.venv/Scripts/python collect/app.py --share   # temporary public https link via Cloudflare
 ```
 
 `--share` needs Cloudflare's free `cloudflared` program: install it with
