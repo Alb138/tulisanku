@@ -24,7 +24,8 @@ def main():
     parser.add_argument("--dest", type=Path, default=Path("data/raw/handwriting/drawn"))
     args = parser.parse_args()
 
-    key = os.environ.get("TULISANKU_EXPORT_KEY") or getpass.getpass("Export key: ")
+    key = os.environ.get("TULISANKU_EXPORT_KEY") or getpass.getpass(
+        "Export key (typing is hidden - paste with right-click, then press Enter): ")
     try:
         with urlopen(f"{args.url.rstrip('/')}/api/export?{urlencode({'key': key})}", timeout=300) as response:
             data = response.read()
