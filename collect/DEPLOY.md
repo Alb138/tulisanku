@@ -23,22 +23,31 @@ Drawings are stored on PythonAnywhere (512 MB free; one person's 62 drawings tak
    → choose the newest Python version → *Next*.
 
 5. On the Web tab, click the **WSGI configuration file** link
-   (`/var/www/<username>_pythonanywhere_com_wsgi.py`). Delete everything in it, paste the
-   lines below (fill in your username and key), and **Save**:
+   (`/var/www/<username>_pythonanywhere_com_wsgi.py`). Delete everything in it, **type** the
+   lines below (fill in your key), and **Save**:
    ```python
    import os, sys
-   sys.path.insert(0, "/home/<username>/tulisanku")
+   sys.path.insert(0, os.path.expanduser("~/tulisanku"))
    os.environ["TULISANKU_EXPORT_KEY"] = "<your secret key>"
    from collect.app import app as application
    ```
    This file lives only on PythonAnywhere, so the key never reaches GitHub.
 
-6. Back on the Web tab, click **Reload**, then open `https://<username>.pythonanywhere.com`.
-   You should see the TULISANKU consent page. Share that link with your friends.
+6. Back on the Web tab, click **Reload**, then open `https://<username>.pythonanywhere.com`
+   (press Ctrl+F5 to skip the browser's cached copy). You should see the TULISANKU consent
+   page. Share that link with your friends.
 
-If the page shows an error, open the **error log** link on the Web tab. An error mentioning
-Flask usually means its version is too old: in the Bash console run
-`pip3 install --user --upgrade flask` (use the same Python version as the web app), then Reload.
+## If it shows "Something went wrong"
+
+Open the **error log** link on the Web tab and read the **newest entries at the bottom**.
+Times are in UTC (Jakarta time minus 7 hours) - make sure you are reading an error from
+after your last change. Changes only take effect after **Save** and then **Reload**.
+
+| Error in the log | Cause and fix |
+|---|---|
+| `IndentationError: unexpected indent` / `SyntaxError` on line 1 | A space before a line, or an invisible character copied from a chat or web page. Delete the file's content and *type* the 4 lines. |
+| `ModuleNotFoundError: No module named 'collect'` | Python can't find the code: run `ls ~/tulisanku` in a Bash console; if it is missing, `git clone` it (step 3). Use `os.path.expanduser("~/tulisanku")` so upper/lower case in the username can't matter. |
+| An error mentioning Flask | Flask is too old: `pip3 install --user --upgrade flask` (same Python version as the web app), then Reload. |
 
 ## Every month
 
