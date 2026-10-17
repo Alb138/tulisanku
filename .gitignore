@@ -17,3 +17,6 @@ checkpoints/
 
 # ...except the printable handwriting sheet, which is part of the project
 !templates/*.pdf
+
+# Downloaded helper programs (e.g. cloudflared.exe)
+tools/

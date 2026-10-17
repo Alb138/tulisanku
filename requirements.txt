@@ -6,5 +6,6 @@ matplotlib
 pandas
 scipy
 flask
+waitress
 torch
 torchvision

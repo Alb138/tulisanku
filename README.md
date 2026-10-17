@@ -57,11 +57,19 @@ python -m venv .venv
 ## Collecting handwriting
 
 ```bash
-.venv/Scripts/python collect/app.py   # prints an address to open on phones on the same Wi-Fi
+.venv/Scripts/python collect/app.py           # address for phones on the same Wi-Fi
+.venv/Scripts/python collect/app.py --share   # public https link, usable from anywhere
 ```
 
+`--share` needs Cloudflare's free `cloudflared` program: install it with
+`winget install --id Cloudflare.cloudflared` (then open a new terminal), or download
+`cloudflared-windows-amd64.exe` from https://github.com/cloudflare/cloudflared/releases and save it as
+`tools/cloudflared.exe`. The laptop must stay on while people use the link, and the link changes on
+every restart.
+
 Each character is saved as it is drawn to `data/raw/handwriting/drawn/<session>/` (image + pen strokes).
-Data stays on the laptop running the server and is never committed.
+Data stays on the laptop running the server and is never committed. Uploads are limited to 2 MB and
+must be PNG images.
 
 ## Data and licenses
 
