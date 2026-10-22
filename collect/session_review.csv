@@ -1,0 +1,39 @@
+session,writer,characters,use,reason
+0e4ec716,team-1,62,yes,
+fadc90f8,team-1,62,yes,
+ea2ddb5b,team-1,2,no,empty or abandoned test (fewer than 10 characters)
+27dddc07,team-1,62,yes,
+998fd1e2,w01,62,yes,
+b31c6dd5,w02,62,yes,
+b61bf09d,w03,0,no,empty or abandoned test (fewer than 10 characters)
+976874f0,w04,62,yes,
+7d448c90,w05,62,yes,
+a3e4e46d,w05,18,no,"partial repeat by the writer of 7d448c90 (same device, 83% stroke agreement)"
+c35cc89f,w06,62,yes,
+14b62193,w07,62,yes,
+beb8eed3,w08,62,yes,
+330fe76e,w09,62,yes,
+c5813184,w10,31,yes,"partial (31 characters, kept with mask)"
+930b4024,w11,62,yes,
+d59b1a55,w12,62,yes,
+85f8f8f2,w13,62,yes,
+77268e02,w14,62,yes,
+0f285a0c,w15,42,yes,"partial (42 characters, kept with mask)"
+020b5e6f,w16,2,no,empty or abandoned test (fewer than 10 characters)
+1f83f2a9,w17,62,yes,
+40bbed4a,w18,0,no,empty or abandoned test (fewer than 10 characters)
+e2622a15,w19,0,no,empty or abandoned test (fewer than 10 characters)
+6529ddc7,w20,62,yes,
+03089131,w21,62,yes,
+c80a1501,w22,62,yes,
+7d68dac7,w23,62,yes,
+3e9475ec,w24,62,yes,
+a3361e7a,w25,62,yes,
+f47d9d53,w26,62,yes,
+28957c79,w27,62,yes,
+22d15167,w28,62,yes,
+62385e6b,w29,62,yes,
+6d878520,w30,62,yes,
+38da09ad,w31,62,yes,
+2339c7e1,w32,62,yes,
+23a5815c,w33,62,yes,
