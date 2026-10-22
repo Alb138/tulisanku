@@ -25,12 +25,18 @@ tulisanku/              Python package (reusable code)
   nist.py               NIST SD19: label join, scan cleaning, baseline rebuilding
   template.py           layout of the printable handwriting sheet
   download.py           parallel, resumable downloader (the NIST server is slow)
+  data.py               load datasets via memory mapping (the laptop has little free RAM)
+  evaluation.py         few-shot evaluation: k references -> generate the rest -> L1 / SSIM / ink IoU
+  baselines.py          mean glyph and nearest font (no generation; every model must beat them)
 scripts/
   build_font_dataset.py Google Fonts -> fonts_<size>.npz / .csv / preview
   clean_font_dataset.py decide which fonts to keep -> fonts_<size>_quality.csv + contact sheets
   download_nist.py      NIST SD19 by_write.zip (by_class.zip is fetched the same way)
   build_nist_dataset.py NIST -> nist_<size>.npz (images + mask) / .csv / preview
   make_template_sheet.py templates/tulisanku_sheet.pdf
+  fetch_collected.py    download drawings from the hosted collection page
+  build_drawn_dataset.py drawings -> drawn_<size>.npz (same format as NIST)
+  evaluate_baselines.py baselines on held-out fonts, NIST test writers and drawn handwriting
 collect/
   app.py                handwriting collection page (Flask): draw each character on a phone
 templates/
