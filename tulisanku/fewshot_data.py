@@ -22,6 +22,9 @@ class FewShotBatches:
         self.block_rows, self.samples_per_row, self.blocks_per_pool = block_rows, samples_per_row, blocks_per_pool
         weights = np.ones(len(sources)) if weights is None else np.asarray(weights, float)
         self.weights = weights / weights.sum()
+        # Every row (writer or font) of every source gets one id: source 0 rows first, then source 1, ...
+        self.offsets = np.cumsum([0] + [len(images) for images, _ in sources])
+        self.n_writers = int(self.offsets[-1])
 
     def _examples(self, rng, source):
         images, mask = self.sources[source]
@@ -43,11 +46,12 @@ class FewShotBatches:
                 ref_images[:k] = block[row, refs]
                 ref_mask = np.zeros(self.max_refs, bool)
                 ref_mask[:k] = True
-                out.append((ref_images, ref_mask, target, block[row, target]))
+                out.append((ref_images, ref_mask, target, block[row, target], self.offsets[source] + start + row))
         return out
 
     def batches(self, seed: int = 0):
-        """Endless stream of (refs [B, K, H, W] uint8, ref_mask [B, K], target_char [B], target [B, H, W] uint8)."""
+        """Endless stream of (refs [B, K, H, W] uint8, ref_mask [B, K], target_char [B], target [B, H, W] uint8,
+        writer [B]) - writer ids run from 0 to n_writers - 1."""
         rng = np.random.default_rng(seed)
         pool = []
         while True:
@@ -58,5 +62,6 @@ class FewShotBatches:
             for b in range(0, n_full, self.batch_size):
                 batch = [pool[i] for i in order[b:b + self.batch_size]]
                 yield (np.stack([e[0] for e in batch]), np.stack([e[1] for e in batch]),
-                       np.array([e[2] for e in batch], np.int64), np.stack([e[3] for e in batch]))
+                       np.array([e[2] for e in batch], np.int64), np.stack([e[3] for e in batch]),
+                       np.array([e[4] for e in batch], np.int64))
             pool = [pool[i] for i in order[n_full:]]

@@ -5,7 +5,8 @@ k = 1..8 reference glyphs of one writer and one target glyph of the same writer.
 
 One training step (two players, taking turns):
   1. Critic (discriminator) step: show it real target glyphs and generated ones; it learns
-     to score real ones high and generated ones low (hinge loss).
+     to score real ones high and generated ones low (hinge loss). With --style-critic it
+     also gets the writer's id and judges "is this a real glyph of THIS writer?".
   2. Generator step: generate again; it learns to (a) make the critic score its glyphs as
      real, and (b) match the real target glyph (L1 loss, weight --l1).
   3. Update the EMA copy of the generator (a smoothed average of its weights).
@@ -64,6 +65,11 @@ def sample_sheet(model, writers, path, step):
     img.save(path)
 
 
+def critic_loss(real_scores, fake_scores):
+    """Hinge loss, averaged over the critic's heads (character, and writer with --style-critic)."""
+    return sum(F.relu(1 - r).mean() + F.relu(1 + f).mean() for r, f in zip(real_scores, fake_scores)) / len(real_scores)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--steps", type=int, default=40000)
@@ -72,6 +78,8 @@ def main():
     parser.add_argument("--lr-g", type=float, default=2e-4)
     parser.add_argument("--lr-d", type=float, default=2e-4)
     parser.add_argument("--l1", type=float, default=50.0, help="weight of 'match the real glyph' vs 'fool the critic'")
+    parser.add_argument("--style-critic", action="store_true",
+                        help="critic also checks whose handwriting it is (one embedding per training writer/font)")
     parser.add_argument("--ema", type=float, default=0.999)
     parser.add_argument("--sample-every", type=int, default=1000)
     parser.add_argument("--eval-every", type=int, default=5000)
@@ -88,7 +96,8 @@ def main():
     bank = torch.from_numpy(content_bank).to(DEVICE)
 
     config = {"width": 64, "style_dim": 256}
-    G, D = Generator(**config).to(DEVICE), Discriminator().to(DEVICE)
+    G = Generator(**config).to(DEVICE)
+    D = Discriminator(n_styles=data.n_writers if args.style_critic else 0).to(DEVICE)
     G_ema = copy.deepcopy(G).eval().requires_grad_(False)
     opt_g = torch.optim.Adam(G.parameters(), lr=args.lr_g, betas=(0.0, 0.99))
     opt_d = torch.optim.Adam(D.parameters(), lr=args.lr_d, betas=(0.0, 0.99))
@@ -122,17 +131,17 @@ def main():
     batches = data.batches(seed=start)
     t0, logs = time.time(), []
     for step in range(start + 1, args.steps + 1):
-        refs, ref_mask, char, target = next(batches)
+        refs, ref_mask, char, target, writer = next(batches)
         refs = torch.from_numpy(refs).to(DEVICE).float().div_(255).unsqueeze(2)       # [B, K, 1, H, W]
         ref_mask = torch.from_numpy(ref_mask).to(DEVICE)
-        char = torch.from_numpy(char).to(DEVICE)
+        char, writer = torch.from_numpy(char).to(DEVICE), torch.from_numpy(writer).to(DEVICE)
         target = torch.from_numpy(target).to(DEVICE).float().div_(255).unsqueeze(1)  # [B, 1, H, W]
         content = bank[char].unsqueeze(1)
 
         # 1. Critic step (the critic runs in full 32-bit precision: small, and more stable)
         with torch.no_grad(), torch.autocast(DEVICE, dtype=torch.bfloat16):
             fake = G(content, refs, ref_mask)
-        d_loss = F.relu(1 - D(target, char)).mean() + F.relu(1 + D(fake.float(), char)).mean()
+        d_loss = critic_loss(D(target, char, writer), D(fake.float(), char, writer))
         opt_d.zero_grad(set_to_none=True)
         d_loss.backward()
         opt_d.step()
@@ -141,7 +150,8 @@ def main():
         with torch.autocast(DEVICE, dtype=torch.bfloat16):
             fake = G(content, refs, ref_mask)
         fake = fake.float()
-        adv = -D(fake, char).mean()
+        scores = D(fake, char, writer)
+        adv = -sum(s.mean() for s in scores) / len(scores)
         l1 = (fake - target).abs().mean()
         g_loss = adv + args.l1 * l1
         opt_g.zero_grad(set_to_none=True)

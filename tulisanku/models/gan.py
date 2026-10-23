@@ -11,6 +11,10 @@ Generator
 Discriminator
   Looks at one glyph and outputs a realism score. It also knows which character the glyph
   should be ("projection" conditioning): a sharp glyph of the wrong letter still scores low.
+  Optionally a second head also knows WHO wrote it (one learned embedding per training
+  writer or font): "is this a real glyph of writer #1234?". Without it, the critic only
+  asks "is this a realistic B?", so nothing but the L1 loss rewards matching the person
+  (as in DM-Font / LF-Font, which condition the critic on both character and font).
   Spectral normalization keeps the critic from changing too abruptly, which makes GAN
   training much more stable.
 """
@@ -100,7 +104,7 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, n_chars: int = 62, width: int = 64):
+    def __init__(self, n_chars: int = 62, width: int = 64, n_styles: int = 0):
         super().__init__()
         w = width
         sn = spectral_norm
@@ -112,7 +116,13 @@ class Discriminator(nn.Module):
         )
         self.linear = sn(nn.Linear(8 * w, 1))
         self.embed = sn(nn.Embedding(n_chars, 8 * w))
+        self.style_embed = sn(nn.Embedding(n_styles, 8 * w)) if n_styles else None
 
-    def forward(self, x, char):
+    def forward(self, x, char, style=None):
+        """List of scores, one per head: [realism + "is it this char?"] (+ [realism + "is it this writer?"])."""
         h = self.body(x).sum(dim=(2, 3))
-        return self.linear(h).squeeze(1) + (self.embed(char) * h).sum(1)  # realism + "is it this char?"
+        real = self.linear(h).squeeze(1)
+        scores = [real + (self.embed(char) * h).sum(1)]
+        if self.style_embed is not None:
+            scores.append(real + (self.style_embed(style) * h).sum(1))
+        return scores
