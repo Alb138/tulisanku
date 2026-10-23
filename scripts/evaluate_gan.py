@@ -9,8 +9,10 @@
    trials and reference letters as scripts/evaluate_baselines.py, so the numbers are
    directly comparable with outputs/results/baselines_summary.csv.
 
-Writes outputs/results/gan.csv, gan_summary.csv, gan_memorization.csv and
-       outputs/figures/gan_examples_{nist,drawn}.png (references, truth, nearest font, GANs).
+Writes outputs/results/<name>.csv, <name>_summary.csv, <name>_memorization.csv and
+       outputs/figures/<name>_examples_{nist,drawn}.png (references, truth, nearest font, GANs),
+where <name> is --name (one per experiment, e.g. gan_style), and prints a k=5 scoreboard of
+the baselines and every experiment evaluated so far.
 """
 import argparse
 import sys
@@ -33,7 +35,8 @@ METRICS = ["l1", "ssim", "iou", "legible", "legible_merged", "style_top1", "styl
 
 def load_gan(path: Path) -> GanModel:
     model = GanModel(path)
-    model.name = f"GAN {int(path.stem.split('_')[-1]) // 1000}k"  # ema_015000.pt -> "GAN 15k"
+    run = path.parent.name.removeprefix("gan").strip("_")  # checkpoints/gan_style -> "style", checkpoints/gan -> ""
+    model.name = " ".join(filter(None, ["GAN", run, f"{int(path.stem.split('_')[-1]) // 1000}k"]))  # "GAN style 15k"
     return model
 
 
@@ -58,6 +61,7 @@ def main():
     parser.add_argument("--ks", type=int, nargs="+", default=[1, 5, 20])
     parser.add_argument("--trials", type=int, default=3)
     parser.add_argument("--memorization-writers", type=int, default=300)
+    parser.add_argument("--name", default="gan", help="prefix of the result files, one per experiment")
     parser.add_argument("--out", type=Path, default=Path("outputs"))
     args = parser.parse_args()
     (args.out / "results").mkdir(parents=True, exist_ok=True)
@@ -67,7 +71,7 @@ def main():
     reader, judge = Reader(), StyleJudge()
 
     memo = memorization_check(models, reader, args.memorization_writers)
-    memo.to_csv(args.out / "results" / "gan_memorization.csv", index=False)
+    memo.to_csv(args.out / "results" / f"{args.name}_memorization.csv", index=False)
 
     test_sets = {"fonts (held out)": load_fonts("test"), "NIST (high school)": load_handwriting("nist", "test"),
                  "drawn (ours)": load_handwriting("drawn")}
@@ -81,20 +85,21 @@ def main():
                 print(f"{set_name:20s} {model.name:8s} k={k:2d}  "
                       + "  ".join(f"{m}={r[m].mean():.3f}" for m in METRICS), flush=True)
     results = pd.concat(results, ignore_index=True)
-    results.to_csv(args.out / "results" / "gan.csv", index=False)
+    results.to_csv(args.out / "results" / f"{args.name}.csv", index=False)
     summary = results.groupby(["test_set", "model", "k"])[METRICS].mean().round(3)
-    summary.to_csv(args.out / "results" / "gan_summary.csv")
+    summary.to_csv(args.out / "results" / f"{args.name}_summary.csv")
 
-    baselines = pd.read_csv(args.out / "results" / "baselines_summary.csv", index_col=["test_set", "model", "k"])
-    table = pd.concat([baselines, summary]).xs(5, level="k")
-    print("\nAll models, k=5:\n", table.to_string())
+    # Scoreboard: baselines + every GAN experiment evaluated so far
+    files = [args.out / "results" / "baselines_summary.csv", *sorted((args.out / "results").glob("gan*_summary.csv"))]
+    table = pd.concat([pd.read_csv(f, index_col=["test_set", "model", "k"]) for f in files]).xs(5, level="k")
+    print("\nAll models, k=5:\n", table.sort_index().to_string())
 
     library, _, _ = load_fonts("train")
     figure_models = [NearestFont(library), *models]
     images, mask, _ = test_sets["NIST (high school)"]
-    example_figure(figure_models, images, mask, [0, 1, 2], 5, args.out / "figures" / "gan_examples_nist.png")
+    example_figure(figure_models, images, mask, [0, 1, 2], 5, args.out / "figures" / f"{args.name}_examples_nist.png")
     images, mask, _ = test_sets["drawn (ours)"]
-    example_figure(figure_models, images, mask, [3, 6, 9], 5, args.out / "figures" / "gan_examples_drawn.png")
+    example_figure(figure_models, images, mask, [3, 6, 9], 5, args.out / "figures" / f"{args.name}_examples_drawn.png")
 
 
 if __name__ == "__main__":
