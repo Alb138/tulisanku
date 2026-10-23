@@ -15,7 +15,7 @@ progress is judged from the sample images and the periodic validation scores.
 The evaluation networks (character classifier, style encoder) are NOT used for training:
 a model trained to please its judges would get inflated scores.
 
-Outputs: checkpoints/gan/last.pt (everything, for resuming), checkpoints/gan/ema_<step>.pt,
+Outputs: checkpoints/gan/last.pt (everything, for resuming; every --sample-every steps), checkpoints/gan/ema_<step>.pt,
 outputs/gan/samples/step_<step>.png, outputs/results/gan_history.json
 """
 import argparse
@@ -170,14 +170,16 @@ def main():
             history.append({"step": step, **scores})
             print(f"  validation (100 NIST val writers, k=5): " + "  ".join(f"{m}={v:.3f}" for m, v in scores.items()),
                   flush=True)
-            torch.save({"generator": G.state_dict(), "discriminator": D.state_dict(),
-                        "generator_ema": G_ema.state_dict(), "opt_g": opt_g.state_dict(), "opt_d": opt_d.state_dict(),
-                        "step": step, "history": history, "config": config, "content_bank": content_bank},
-                       args.out / "last.pt")
             torch.save({"generator_ema": G_ema.state_dict(), "config": config, "content_bank": content_bank,
                         "step": step, "val": scores}, args.out / f"ema_{step:06d}.pt")
             Path("outputs/results").mkdir(parents=True, exist_ok=True)
             json.dump(history, open("outputs/results/gan_history.json", "w"), indent=2)
+        # Resume point, saved often: an interrupted run loses at most --sample-every steps
+        if step % args.sample_every == 0 or step == args.steps:
+            torch.save({"generator": G.state_dict(), "discriminator": D.state_dict(),
+                        "generator_ema": G_ema.state_dict(), "opt_g": opt_g.state_dict(), "opt_d": opt_d.state_dict(),
+                        "step": step, "history": history, "config": config, "content_bank": content_bank},
+                       args.out / "last.pt")
 
 
 if __name__ == "__main__":
