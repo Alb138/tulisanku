@@ -33,6 +33,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tulisanku.augment import augment  # noqa: E402
 from tulisanku.charset import CHARSET  # noqa: E402
+from tulisanku.charset import LOOK_ALIKE as LOOK_ALIKE_GROUPS  # noqa: E402
 from tulisanku.data import load_fonts, load_handwriting  # noqa: E402
 from tulisanku.models.classifier import CharClassifier  # noqa: E402
 from tulisanku.training_data import GlyphBatches  # noqa: E402
@@ -44,16 +45,7 @@ def to_tensor(x: np.ndarray) -> torch.Tensor:
     return torch.from_numpy(x).to(DEVICE).float().div_(255).unsqueeze(1)  # [B, 1, H, W], 0..1
 
 
-def look_alike(char: str) -> str:
-    """Merge characters that are often identical in handwriting: case, 0/O/o, 1/I/l."""
-    if char in "0Oo":
-        return "o"
-    if char in "1Il":
-        return "l"
-    return char.lower()
-
-
-LOOK_ALIKE = np.array([look_alike(c) for c in CHARSET])
+LOOK_ALIKE = np.array(LOOK_ALIKE_GROUPS)
 
 
 def train_one_epoch(model, batches, optimizer, scheduler, scaler, loss_fn, seed):

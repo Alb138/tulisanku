@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tulisanku.baselines import MeanGlyph, NearestFont  # noqa: E402
 from tulisanku.data import load_fonts, load_handwriting  # noqa: E402
 from tulisanku.evaluation import evaluate, pick_references  # noqa: E402
+from tulisanku.legibility import Reader  # noqa: E402
 
 
 def example_figure(models, images, mask, writers, k, path, seed=0, n_targets=14):
@@ -46,6 +47,8 @@ def main():
 
     library, _, _ = load_fonts("train")
     models = [MeanGlyph(library), NearestFont(library)]
+    reader = Reader()
+    metrics = ["l1", "ssim", "iou", "legible", "legible_merged"]
     test_sets = {"fonts (held out)": load_fonts("test"), "NIST (high school)": load_handwriting("nist", "test"),
                  "drawn (ours)": load_handwriting("drawn")}
 
@@ -53,16 +56,18 @@ def main():
     for set_name, (images, mask, _) in test_sets.items():
         for model in models:
             for k in args.ks:
-                r = evaluate(model, images, mask, k, trials=args.trials)
+                r = evaluate(model, images, mask, k, trials=args.trials, reader=reader)
                 results.append(r.assign(test_set=set_name, model=model.name))
                 print(f"{set_name:20s} {model.name:13s} k={k:2d}  "
-                      + "  ".join(f"{m}={r[m].mean():.3f}" for m in ("l1", "ssim", "iou")), flush=True)
+                      + "  ".join(f"{m}={r[m].mean():.3f}" for m in metrics), flush=True)
+        print(f"{set_name:20s} real handwriting (ceiling): legible={r['real_legible'].mean():.3f}  "
+              f"legible_merged={r['real_legible_merged'].mean():.3f}", flush=True)
     results = pd.concat(results, ignore_index=True)
 
     (args.out / "results").mkdir(parents=True, exist_ok=True)
     (args.out / "figures").mkdir(parents=True, exist_ok=True)
     results.to_csv(args.out / "results" / "baselines.csv", index=False)
-    summary = results.groupby(["test_set", "model", "k"])[["l1", "ssim", "iou"]].mean().round(3)
+    summary = results.groupby(["test_set", "model", "k"])[metrics].mean().round(3)
     summary.to_csv(args.out / "results" / "baselines_summary.csv")
     print("\n", summary.unstack("model").to_string())
 

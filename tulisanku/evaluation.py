@@ -14,6 +14,9 @@ Scores (averaged over a writer's generated characters):
   ssim  structural similarity: local brightness,
         contrast and structure, not single pixels (higher is better, max 1)
   iou   overlap of the inked areas                 (higher is better, max 1)
+With a Reader (the trained character classifier, see legibility.py) also:
+  legible, legible_merged            share of generated glyphs read as the intended character
+  real_legible, real_legible_merged  the same for the writer's real glyphs: the ceiling
 """
 import numpy as np
 import pandas as pd
@@ -50,7 +53,7 @@ def pick_references(available: np.ndarray, k: int, seed: int, trial: int, writer
     return refs, np.setdiff1d(available, refs)
 
 
-def evaluate(model, images, mask, k: int, trials: int = 3, seed: int = 0) -> pd.DataFrame:
+def evaluate(model, images, mask, k: int, trials: int = 3, seed: int = 0, reader=None) -> pd.DataFrame:
     """One row per (writer, trial) with the writer's average scores."""
     rows = []
     for writer in range(len(images)):
@@ -61,5 +64,9 @@ def evaluate(model, images, mask, k: int, trials: int = 3, seed: int = 0) -> pd.
         for trial in range(trials):
             refs, targets = pick_references(available, k, seed, trial, writer)
             pred = model.predict(glyphs[refs], refs, targets)
-            rows.append({"writer": writer, "trial": trial, "k": k, **scores(pred, glyphs[targets])})
+            row = {"writer": writer, "trial": trial, "k": k, **scores(pred, glyphs[targets])}
+            if reader is not None:
+                row.update(reader.scores(pred, targets))
+                row.update({f"real_{name}": v for name, v in reader.scores(glyphs[targets] / 255, targets).items()})
+            rows.append(row)
     return pd.DataFrame(rows)
