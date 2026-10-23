@@ -17,6 +17,8 @@ Scores (averaged over a writer's generated characters):
 With a Reader (the trained character classifier, see legibility.py) also:
   legible, legible_merged            share of generated glyphs read as the intended character
   real_legible, real_legible_merged  the same for the writer's real glyphs: the ceiling
+With a StyleGallery (the trained style encoder over the test set's real glyphs, see style.py):
+  style_top1, style_top5, style_pct  is the generated alphabet most like the true writer's?
 """
 import numpy as np
 import pandas as pd
@@ -53,7 +55,7 @@ def pick_references(available: np.ndarray, k: int, seed: int, trial: int, writer
     return refs, np.setdiff1d(available, refs)
 
 
-def evaluate(model, images, mask, k: int, trials: int = 3, seed: int = 0, reader=None) -> pd.DataFrame:
+def evaluate(model, images, mask, k: int, trials: int = 3, seed: int = 0, reader=None, style=None) -> pd.DataFrame:
     """One row per (writer, trial) with the writer's average scores."""
     rows = []
     for writer in range(len(images)):
@@ -68,5 +70,7 @@ def evaluate(model, images, mask, k: int, trials: int = 3, seed: int = 0, reader
             if reader is not None:
                 row.update(reader.scores(pred, targets))
                 row.update({f"real_{name}": v for name, v in reader.scores(glyphs[targets] / 255, targets).items()})
+            if style is not None:
+                row.update(style.score(writer, pred, targets))
             rows.append(row)
     return pd.DataFrame(rows)

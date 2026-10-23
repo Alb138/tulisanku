@@ -20,6 +20,7 @@ from tulisanku.baselines import MeanGlyph, NearestFont  # noqa: E402
 from tulisanku.data import load_fonts, load_handwriting  # noqa: E402
 from tulisanku.evaluation import evaluate, pick_references  # noqa: E402
 from tulisanku.legibility import Reader  # noqa: E402
+from tulisanku.style import StyleGallery, StyleJudge  # noqa: E402
 
 
 def example_figure(models, images, mask, writers, k, path, seed=0, n_targets=14):
@@ -47,16 +48,17 @@ def main():
 
     library, _, _ = load_fonts("train")
     models = [MeanGlyph(library), NearestFont(library)]
-    reader = Reader()
-    metrics = ["l1", "ssim", "iou", "legible", "legible_merged"]
+    reader, judge = Reader(), StyleJudge()
+    metrics = ["l1", "ssim", "iou", "legible", "legible_merged", "style_top1", "style_pct"]
     test_sets = {"fonts (held out)": load_fonts("test"), "NIST (high school)": load_handwriting("nist", "test"),
                  "drawn (ours)": load_handwriting("drawn")}
 
     results = []
-    for set_name, (images, mask, _) in test_sets.items():
+    for set_name, (images, mask, meta) in test_sets.items():
+        gallery = StyleGallery(judge, images, mask, meta["writer"] if "writer" in meta else None)
         for model in models:
             for k in args.ks:
-                r = evaluate(model, images, mask, k, trials=args.trials, reader=reader)
+                r = evaluate(model, images, mask, k, trials=args.trials, reader=reader, style=gallery)
                 results.append(r.assign(test_set=set_name, model=model.name))
                 print(f"{set_name:20s} {model.name:13s} k={k:2d}  "
                       + "  ".join(f"{m}={r[m].mean():.3f}" for m in metrics), flush=True)
