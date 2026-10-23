@@ -47,10 +47,16 @@ def _subset(name: str, key: str, rows: np.ndarray) -> np.ndarray:
     return np.load(path, mmap_mode="r")
 
 
-def load_fonts(split: str = None, clean: bool = True, size: int = 64):
-    """Font glyphs: (images [n, 62, size, size], mask [n, 62], metadata)."""
+def load_fonts(split: str = None, clean: bool = True, caps_only: bool = True, size: int = 64):
+    """Font glyphs: (images [n, 62, size, size], mask [n, 62], metadata).
+
+    caps_only=False drops fonts whose lowercase letters are drawn as capitals: fine as a
+    style, but they would teach a character classifier that "A" and "a" look the same.
+    """
     meta = pd.read_csv(PROCESSED / f"fonts_{size}_quality.csv", keep_default_na=False)
     keep = (meta["reason"] == "") if clean else pd.Series(True, index=meta.index)
+    if not caps_only:
+        keep &= meta["caps_only"].astype(str) != "True"
     if split:
         keep &= meta["split"] == split
     meta = meta[keep]
