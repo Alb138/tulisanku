@@ -17,9 +17,9 @@ class GanModel:
             ckpt = torch.load(checkpoint, map_location=self.device)
             generator = Generator(**ckpt["config"]).to(self.device)
             generator.load_state_dict(ckpt["generator_ema"])
-            content_bank = ckpt["content_bank"]
+            content_bank = ckpt["content_bank"]  # a tensor, so the safe weights_only loading works
         self.generator = generator.eval()
-        self.content = torch.as_tensor(np.asarray(content_bank), dtype=torch.float32, device=self.device)
+        self.content = torch.as_tensor(content_bank, dtype=torch.float32, device=self.device)
 
     @torch.no_grad()
     def predict(self, ref_images, ref_idx, target_idx):

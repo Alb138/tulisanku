@@ -170,7 +170,7 @@ def main():
             history.append({"step": step, **scores})
             print(f"  validation (100 NIST val writers, k=5): " + "  ".join(f"{m}={v:.3f}" for m, v in scores.items()),
                   flush=True)
-            torch.save({"generator_ema": G_ema.state_dict(), "config": config, "content_bank": content_bank,
+            torch.save({"generator_ema": G_ema.state_dict(), "config": config, "content_bank": torch.from_numpy(content_bank),
                         "step": step, "val": scores}, args.out / f"ema_{step:06d}.pt")
             Path("outputs/results").mkdir(parents=True, exist_ok=True)
             json.dump(history, open("outputs/results/gan_history.json", "w"), indent=2)
@@ -178,7 +178,7 @@ def main():
         if step % args.sample_every == 0 or step == args.steps:
             torch.save({"generator": G.state_dict(), "discriminator": D.state_dict(),
                         "generator_ema": G_ema.state_dict(), "opt_g": opt_g.state_dict(), "opt_d": opt_d.state_dict(),
-                        "step": step, "history": history, "config": config, "content_bank": content_bank},
+                        "step": step, "history": history, "config": config, "content_bank": torch.from_numpy(content_bank)},
                        args.out / "last.pt")
 
 
