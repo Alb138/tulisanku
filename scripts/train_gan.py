@@ -15,8 +15,8 @@ progress is judged from the sample images and the periodic validation scores.
 The evaluation networks (character classifier, style encoder) are NOT used for training:
 a model trained to please its judges would get inflated scores.
 
-Outputs: checkpoints/gan/last.pt (everything, for resuming; every --sample-every steps), checkpoints/gan/ema_<step>.pt,
-outputs/gan/samples/step_<step>.png, outputs/results/gan_history.json
+Outputs: <out>/last.pt (everything, for resuming; every --sample-every steps), <out>/ema_<step>.pt,
+outputs/<run>/samples/step_<step>.png, outputs/results/<run>_history.json  (<run> = name of the --out folder)
 """
 import argparse
 import copy
@@ -112,7 +112,8 @@ def main():
     for session in ["27dddc07", *drawn_meta.session[drawn_meta.writer != "team-1"][:3]]:
         i = int(drawn_meta.index[drawn_meta.session == session][0])
         show.append((f"drawn {session}", np.asarray(drawn[i]), drawn_mask[i]))
-    samples_dir = Path("outputs/gan/samples")
+    run = args.out.name  # "gan" for the default run; other runs keep their own samples and history
+    samples_dir = Path("outputs") / run / "samples"
     samples_dir.mkdir(parents=True, exist_ok=True)
     reader, judge = Reader(), StyleJudge()
     val_gallery = StyleGallery(judge, val_images[:100], val_mask[:100])
@@ -173,7 +174,7 @@ def main():
             torch.save({"generator_ema": G_ema.state_dict(), "config": config, "content_bank": torch.from_numpy(content_bank),
                         "step": step, "val": scores}, args.out / f"ema_{step:06d}.pt")
             Path("outputs/results").mkdir(parents=True, exist_ok=True)
-            json.dump(history, open("outputs/results/gan_history.json", "w"), indent=2)
+            json.dump(history, open(f"outputs/results/{run}_history.json", "w"), indent=2)
         # Resume point, saved often: an interrupted run loses at most --sample-every steps
         if step % args.sample_every == 0 or step == args.steps:
             torch.save({"generator": G.state_dict(), "discriminator": D.state_dict(),
