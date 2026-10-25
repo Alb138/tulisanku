@@ -28,6 +28,17 @@ tulisanku/              Python package (reusable code)
   data.py               load datasets via memory mapping (the laptop has little free RAM)
   evaluation.py         few-shot evaluation: k references -> generate the rest -> L1 / SSIM / ink IoU
   baselines.py          mean glyph and nearest font (no generation; every model must beat them)
+  training_data.py      shuffled glyph batches from memory-mapped data (classifier, style encoder)
+  augment.py            GPU augmentation: small affine changes and stroke thickness
+  legibility.py         Reader: can the character classifier read a generated glyph?
+  style.py              StyleJudge / StyleGallery: does a generated alphabet look like its writer?
+  fewshot_data.py       GAN training examples: k reference glyphs + one target glyph of a writer
+  gan_model.py          a trained GAN generator behind the same predict() interface as the baselines
+  font.py               glyph images -> traced, smoothed outlines -> TrueType font (.ttf)
+  models/
+    classifier.py       character classifier (legibility metric)
+    style.py            style encoder trained to tell writers apart (style metric)
+    gan.py              few-shot GAN: content + style (AdaIN) generator, character/writer critic
 scripts/
   build_font_dataset.py Google Fonts -> fonts_<size>.npz / .csv / preview
   clean_font_dataset.py decide which fonts to keep -> fonts_<size>_quality.csv + contact sheets
@@ -37,6 +48,11 @@ scripts/
   fetch_collected.py    download drawings from the hosted collection page
   build_drawn_dataset.py drawings -> drawn_<size>.npz (same format as NIST)
   evaluate_baselines.py baselines on held-out fonts, NIST test writers and drawn handwriting
+  train_classifier.py   character classifier -> checkpoints/classifier.pt
+  train_style.py        style encoder -> checkpoints/style.pt
+  train_gan.py          few-shot GAN (--style-critic for the writer-aware critic)
+  evaluate_gan.py       GAN checkpoints on the same test sets + a memorization check
+  make_font.py          a few drawn letters -> generated alphabet -> .ttf + preview
 collect/
   app.py                handwriting collection page (Flask): draw each character on a phone
 templates/
@@ -59,6 +75,25 @@ python -m venv .venv
 .venv/Scripts/python scripts/build_font_dataset.py          # ~1 GB of fonts -> data/processed/fonts_64.*
 .venv/Scripts/python scripts/clean_font_dataset.py          # -> fonts_64_quality.csv + contact sheets
 ```
+
+Training and evaluation (after the NIST and drawn datasets are built):
+
+```bash
+.venv/Scripts/python scripts/train_classifier.py            # judges for evaluation, not used to train the GAN
+.venv/Scripts/python scripts/train_style.py
+.venv/Scripts/python scripts/evaluate_baselines.py
+.venv/Scripts/python scripts/train_gan.py --style-critic --steps 20000 --out checkpoints/gan_style   # ~70 min
+.venv/Scripts/python scripts/evaluate_gan.py checkpoints/gan_style/ema_015000.pt --name gan_style
+```
+
+Making a font from a drawn session (5 letters in, 62 characters + basic punctuation out):
+
+```bash
+.venv/Scripts/python scripts/make_font.py --session <id> --refs AgkR7   # outputs/fonts/<name>.ttf + preview
+.venv/Scripts/python scripts/make_font.py --session <id> --real         # from the person's own drawings
+```
+
+Double-click the `.ttf` and choose Install to type with it in Word or any other app.
 
 ## Collecting handwriting
 
