@@ -119,10 +119,11 @@ class Discriminator(nn.Module):
         self.style_embed = sn(nn.Embedding(n_styles, 8 * w)) if n_styles else None
 
     def forward(self, x, char, style=None):
-        """List of scores, one per head: [realism + "is it this char?"] (+ [realism + "is it this writer?"])."""
+        """List of scores, one per head: [realism + "is it this char?"] (+ [realism + "is it this writer?"]).
+        Without `style` (e.g. a new person, who has no writer embedding) only the first head is used."""
         h = self.body(x).sum(dim=(2, 3))
         real = self.linear(h).squeeze(1)
         scores = [real + (self.embed(char) * h).sum(1)]
-        if self.style_embed is not None:
+        if self.style_embed is not None and style is not None:
             scores.append(real + (self.style_embed(style) * h).sum(1))
         return scores

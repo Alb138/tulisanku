@@ -8,31 +8,54 @@
                      it can learn new quirks, but may "forget" how to draw other letters
    The decoder only sees the style code, never the reference images themselves, so it
    cannot simply copy a reference letter into another character.
-2. Calibration: the model also redraws the reference letters, so we can measure how its
-   versions differ from the real ones in size and stroke thickness - and correct every
-   generated letter by the same amount. Size is corrected per group (digits, capitals,
-   lowercase): the model's digits are much too small (NIST writers wrote digits 12% smaller
-   than capitals, and size is where the model is least sure, so it hedges smaller), while
-   capitals are only slightly off. A group without a reference letter uses the overall factor.
+2. Guarding the other letters: the L1 loss only watches the k reference letters, so the
+   other letters can quietly get speckled or broken. Every step, 16 random OTHER letters are
+   also drawn in the person's style and checked by
+     anchor=w   L1 distance to what the model drew for them BEFORE fine-tuning ("learning
+                without forgetting"): the shared network can still pick up quirks, but no
+                single letter can drift far from a clean version
+     critic=..  the trained critic ("is this a realistic B?"), which needs no answer key.
+                A FROZEN critic can be gamed: with weight 1 it turned almost every letter
+                into a box with a frame that this critic scores as "very real". So it gets a
+                small weight and a hinge (no more push once a letter scores as real).
+3. Clean-up (clean=True): remove specks, stray marks and the faint haze away from strokes,
+   with the same blob rules used for cleaning the NIST scans.
+4. Sharpen (sharpen=True): re-draw the edges crisply (a thicken() of 0 pixels), like the
+   uniform pen of a drawing app.
+5. Calibration (calibrate=...): the model also redraws the reference letters, so we can
+   measure how its versions differ from the real ones in size and stroke thickness - and
+   correct every generated letter by the same amount, optionally per group (digits,
+   capitals, lowercase): the model's digits are too small (NIST writers wrote digits 12%
+   smaller than capitals, and size is where the model is least sure, so it hedges smaller).
+   On validation writers this made results worse: 5 letters are too few to measure size.
 """
 import numpy as np
 import torch
-from scipy.ndimage import affine_transform, distance_transform_edt, zoom
+import torch.nn.functional as F
+from scipy.ndimage import affine_transform, binary_dilation, distance_transform_edt, zoom
 
+from .charset import CHARSET
 from .gan_model import GanModel
-from .nist import BASELINE_ROW
+from .models.gan import Discriminator
+from .nist import BASELINE_ROW, clean_scan
 
 THRESHOLD = 0.5
 GROUPS = np.repeat([0, 1, 2], [10, 26, 26])  # CHARSET order: digits, capitals, lowercase
+MIN_SPECK = 4  # pixels at 64 px (the NIST scans use 15 at 128 px)
 
 
-def finetune(generator, content, refs, ref_idx, steps: int, lr: float, part: str = "decoder"):
+def finetune(generator, content, refs, ref_idx, steps: int, lr: float, part: str = "decoder",
+             critic=None, critic_weight: float = 0.1, anchor: float = 0.0,
+             l1_weight: float = 50.0, others: int = 16, seed: int = 0):
     """refs [k, H, W] float 0..1 on the generator's device. Adapts the generator in place
     (part="decoder") and returns the style code to draw with [1, style_dim]."""
+    device = refs.device
     target = refs.unsqueeze(1)
-    glyphs = content[torch.as_tensor(ref_idx, device=refs.device)].unsqueeze(1)
+    k = len(refs)
+    ref_chars = torch.as_tensor(ref_idx, device=device)
     with torch.no_grad():
-        code = generator.style_code(refs[None, :, None], torch.ones(1, len(refs), dtype=torch.bool, device=refs.device))
+        code = generator.style_code(refs[None, :, None], torch.ones(1, k, dtype=torch.bool, device=device))
+        before = generator.draw(content.unsqueeze(1), code.expand(len(content), -1)) if anchor else None
     if part == "code":
         code = code.clone().requires_grad_(True)
         params = [code]
@@ -41,13 +64,38 @@ def finetune(generator, content, refs, ref_idx, steps: int, lr: float, part: str
     for p in params:
         p.requires_grad_(True)
     opt = torch.optim.Adam(params, lr=lr)
+    rng = torch.Generator(device=device).manual_seed(seed)
     for _ in range(steps):
-        loss = (generator.draw(glyphs, code.expand(len(glyphs), -1)) - target).abs().mean()
+        chars = ref_chars
+        if critic is not None or anchor:  # the refs plus random other letters
+            chars = torch.cat([ref_chars, torch.randint(0, len(content), (others,), generator=rng, device=device)])
+        out = generator.draw(content[chars].unsqueeze(1), code.expand(len(chars), -1))
+        loss = l1_weight * (out[:k] - target).abs().mean()
+        if anchor:
+            loss = loss + anchor * (out[k:] - before[chars[k:]]).abs().mean()
+        if critic is not None:
+            loss = loss + critic_weight * F.relu(1 - critic(out[k:], chars[k:])[0]).mean()
         opt.zero_grad(set_to_none=True)
         loss.backward()
         opt.step()
     generator.requires_grad_(False)
     return code.detach()
+
+
+def load_critic(checkpoint, device) -> Discriminator:
+    """The trained critic from a training checkpoint (last.pt), frozen."""
+    state = torch.load(checkpoint, map_location=device)["discriminator"]
+    n_styles = state["style_embed.weight_orig"].shape[0] if "style_embed.weight_orig" in state else 0
+    critic = Discriminator(n_styles=n_styles).to(device)
+    critic.load_state_dict(state)
+    return critic.eval().requires_grad_(False)
+
+
+def clean_glyph(img, char: str):
+    """Remove specks and stray marks (blob rules from nist.clean_scan), then the faint haze
+    that is not next to a kept stroke."""
+    cleaned, _ = clean_scan((np.clip(img, 0, 1) * 255).astype(np.uint8), char, min_speck=MIN_SPECK)
+    return img * binary_dilation(cleaned > 128, iterations=1)
 
 
 def _ink_rows_cols(img):
@@ -98,34 +146,63 @@ def apply_calibration(images, char_idx, scales, delta: float):
 
 
 class AdaptedGan(GanModel):
-    """The GAN plus optional per-person fine-tuning and calibration (same predict() interface)."""
+    """The GAN plus optional per-person fine-tuning and post-processing (same predict() interface).
+
+    cache: pass the same dict to variants that share fine-tuning settings and differ only in
+    post-processing, so each person is fine-tuned once instead of once per variant."""
 
     def __init__(self, checkpoint, steps: int = 0, part: str = "decoder", lr: float = 1e-4,
-                 calibrate: str = None, name: str = None, device: str = None):
-        """calibrate: None, "global" (one size factor) or "group" (digits / capitals / lowercase)."""
+                 anchor: float = 0.0, critic=None, critic_weight: float = 0.1,
+                 calibrate: str = None, clean: bool = False, sharpen: bool = False,
+                 cache: dict = None, name: str = None, device: str = None):
+        """anchor / critic / critic_weight: how the other letters are guarded while fine-tuning
+        (critic = a training checkpoint, last.pt); calibrate: None, "global" or "group"."""
         super().__init__(checkpoint, device)
         self.generator.requires_grad_(False)
         self.base = {k: v.clone() for k, v in self.generator.state_dict().items()}
-        self.steps, self.part, self.lr, self.calibrate = steps, part, lr, calibrate
-        self.name = name or "GAN" + (f" + ft-{part}-{steps}" if steps else "") + (f" + cal-{calibrate}" if calibrate else "")
-        self.last = {}  # details of the last prediction (scale, thickness)
+        self.critic = load_critic(critic, self.device) if critic and steps else None
+        self.steps, self.part, self.lr = steps, part, lr
+        self.anchor, self.critic_weight = anchor, critic_weight
+        self.calibrate, self.clean, self.sharpen = calibrate, clean, sharpen
+        self.cache = cache
+        parts = [f"ft-{part}-{steps}" if steps else "", f"anchor-{anchor:g}" if anchor and steps else "",
+                 f"critic-{critic_weight:g}" if self.critic else "",
+                 f"cal-{calibrate}" if calibrate else "", "clean" if clean else "", "sharpen" if sharpen else ""]
+        self.name = name or " + ".join(["GAN", *filter(None, parts)])
+        self.last = {}  # details of the last prediction (calibration factors)
 
-    def predict(self, ref_images, ref_idx, target_idx):
+    def _generate(self, ref_images, ref_idx, chars):
+        """Fine-tune (if asked) and draw `chars` in the person's style."""
         self.generator.load_state_dict(self.base)  # every person starts from the same model
         refs = torch.as_tensor(np.asarray(ref_images, np.float32) / 255, device=self.device)
-        mask = torch.ones(1, len(refs), dtype=torch.bool, device=self.device)
         if self.steps:
-            code = finetune(self.generator, self.content, refs, ref_idx, self.steps, self.lr, self.part)
+            code = finetune(self.generator, self.content, refs, ref_idx, self.steps, self.lr, self.part,
+                            self.critic, self.critic_weight, self.anchor)
         else:
             with torch.no_grad():
-                code = self.generator.style_code(refs[None, :, None], mask)
-        chars = np.concatenate([np.asarray(target_idx), np.asarray(ref_idx)])  # refs too, for calibration
+                code = self.generator.style_code(refs[None, :, None],
+                                                 torch.ones(1, len(refs), dtype=torch.bool, device=self.device))
         with torch.no_grad():
-            out = self.generator.draw(self.content[torch.as_tensor(chars, device=self.device)].unsqueeze(1),
-                                      code.expand(len(chars), -1)).squeeze(1).cpu().numpy()
+            return self.generator.draw(self.content[torch.as_tensor(chars, device=self.device)].unsqueeze(1),
+                                       code.expand(len(chars), -1)).squeeze(1).cpu().numpy()
+
+    def predict(self, ref_images, ref_idx, target_idx):
+        target_idx, ref_idx = np.asarray(target_idx), np.asarray(ref_idx)
+        chars = np.concatenate([target_idx, ref_idx])  # refs too, for calibration
+        key = (np.asarray(ref_images).tobytes(), tuple(ref_idx), tuple(target_idx))
+        if self.cache is not None and key in self.cache:
+            out = self.cache[key].astype(np.float32)
+        else:
+            out = self._generate(ref_images, ref_idx, chars)
+            if self.cache is not None:
+                self.cache[key] = out.astype(np.float16)
         pred, pred_refs = out[:len(target_idx)], out[len(target_idx):]
         if self.calibrate:
             scales, delta = calibration(pred_refs, np.asarray(ref_images) / 255, ref_idx, self.calibrate == "group")
             self.last = {"scale (digits, capitals, lowercase)": scales.round(2).tolist(), "thicken px": delta}
             pred = apply_calibration(pred, target_idx, scales, delta)
+        if self.clean:
+            pred = np.stack([clean_glyph(p, CHARSET[c]) for p, c in zip(pred, target_idx)])
+        if self.sharpen:
+            pred = np.stack([thicken(p, 0) for p in pred])
         return pred
