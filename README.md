@@ -1,7 +1,7 @@
 # TULISANKU
 
-*Tulisanku* means "my handwriting". Write a few letters on paper, and TULISANKU generates
-every other letter in the same handwriting style, packaged as a font you can type with.
+*Tulisanku* means "my handwriting". Draw a few letters, and TULISANKU generates every other
+letter in the same handwriting style, packaged as a font you can type with.
 
 Final project for COMP6826001 Deep Learning, BINUS University.
 
@@ -53,6 +53,9 @@ scripts/
   train_gan.py          few-shot GAN (--style-critic for the writer-aware critic)
   evaluate_gan.py       GAN checkpoints on the same test sets + a memorization check
   make_font.py          a few drawn letters -> generated alphabet -> .ttf + preview
+webapp/
+  server.py             the TULISANKU app (Flask): draw a few letters -> generated font, live preview, download
+  static/               the page: drawing pad, glyph grid, type-with-your-font preview
 collect/
   app.py                handwriting collection page (Flask): draw each character on a phone
 templates/
@@ -94,6 +97,19 @@ Making a font from a drawn session (5 letters in, 62 characters + basic punctuat
 ```
 
 Double-click the `.ttf` and choose Install to type with it in Word or any other app.
+
+## The app
+
+```bash
+.venv/Scripts/python webapp/server.py            # http://localhost:8001, plus an address for phones on the same Wi-Fi
+.venv/Scripts/python webapp/server.py --share    # temporary public link (needs cloudflared, see below)
+```
+
+Draw at least 5 characters (including a capital, which sets the size of the font), press
+*Generate my font*, type in the preview box to see your handwriting, and download the `.ttf`.
+Characters you drew are used exactly as drawn; the AI writes the rest in your style. Tap any
+AI-written letter to draw it yourself. Drawings are not
+stored; finished fonts are kept in memory for an hour.
 
 ## Collecting handwriting
 

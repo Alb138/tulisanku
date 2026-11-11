@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>TULISANKU · Your handwriting as a font</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main>
+    <section id="intro">
+      <h1>TULISANKU</h1>
+      <p class="lead">Draw a few letters. Get your whole handwriting as a font you can type with.</p>
+      <ol class="steps">
+        <li><strong>Draw</strong> at least 5 characters - more letters, closer match.</li>
+        <li><strong>AI</strong> learns your style and writes every other letter and digit.</li>
+        <li><strong>Type</strong> with your handwriting in Word, Docs or any app.</li>
+      </ol>
+      <label class="field">Name your font
+        <input id="name" maxlength="30" placeholder="My Handwriting" autocomplete="off">
+      </label>
+      <button id="start">Start drawing</button>
+      <p class="note">Your drawings are only used to make your font. They are not stored, and the
+        finished font is forgotten after an hour unless you download it.</p>
+    </section>
+
+    <section id="draw" hidden>
+      <div class="top">
+        <span id="count"></span>
+        <span id="hint"></span>
+      </div>
+      <p class="prompt">Write <strong id="char"></strong> resting on the line, as you normally would.</p>
+      <canvas id="pad" width="512" height="512"></canvas>
+      <div class="buttons">
+        <button id="undo" class="secondary">Undo</button>
+        <button id="clear" class="secondary">Clear</button>
+        <button id="skip" class="secondary">Skip</button>
+        <button id="next">Save</button>
+      </div>
+      <p id="status"></p>
+      <div id="strip" aria-label="Characters drawn so far"></div>
+      <button id="generate" class="wide" disabled>Generate my font</button>
+      <p class="note" id="generate-hint"></p>
+    </section>
+
+    <section id="working" hidden>
+      <div class="spinner" aria-hidden="true"></div>
+      <p class="lead">Learning your handwriting…</p>
+      <p class="note">The AI reads your style from the letters you drew and writes the rest.</p>
+    </section>
+
+    <section id="result" hidden>
+      <h2 id="family"></h2>
+      <textarea id="sample" rows="3" spellcheck="false">The quick brown fox jumps over the lazy dog. Halo, semuanya - apa kabar.</textarea>
+      <label class="size">Size <input id="size" type="range" min="24" max="96" value="48"></label>
+      <div id="grid"></div>
+      <p class="note"><span class="badge">AI</span> marks letters the AI wrote; the others are exactly
+        as you drew them. Tap any letter to draw it yourself.</p>
+      <div class="buttons three">
+        <a id="download" class="button" download>Download font</a>
+        <button id="more" class="secondary">Draw more</button>
+        <button id="restart" class="secondary">Start over</button>
+      </div>
+      <p class="note">To install: double-click the downloaded file and choose <em>Install</em>, then pick
+        <strong id="family-again"></strong> in Word or any other app. The font is released under the
+        SIL Open Font License 1.1. Characters other than 0-9, A-Z, a-z and <code>. , : ; - '</code> are
+        not included yet.</p>
+    </section>
+    <p id="error" role="alert" hidden></p>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>
