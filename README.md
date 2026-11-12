@@ -34,11 +34,14 @@ tulisanku/              Python package (reusable code)
   style.py              StyleJudge / StyleGallery: does a generated alphabet look like its writer?
   fewshot_data.py       GAN training examples: k reference glyphs + one target glyph of a writer
   gan_model.py          a trained GAN generator behind the same predict() interface as the baselines
+  diffusion_model.py    a trained diffusion model behind the same predict() interface (DDIM sampling)
+  adapt.py              per-person fine-tuning, anchoring and cleanup at generation time
   font.py               glyph images -> traced, smoothed outlines -> TrueType font (.ttf)
   models/
     classifier.py       character classifier (legibility metric)
     style.py            style encoder trained to tell writers apart (style metric)
     gan.py              few-shot GAN: content + style (AdaIN) generator, character/writer critic
+    diffusion.py        few-shot diffusion: U-Net noise predictor with content channel + style embedding
 scripts/
   build_font_dataset.py Google Fonts -> fonts_<size>.npz / .csv / preview
   clean_font_dataset.py decide which fonts to keep -> fonts_<size>_quality.csv + contact sheets
@@ -52,6 +55,8 @@ scripts/
   train_style.py        style encoder -> checkpoints/style.pt
   train_gan.py          few-shot GAN (--style-critic for the writer-aware critic)
   evaluate_gan.py       GAN checkpoints on the same test sets + a memorization check
+  train_diffusion.py    few-shot diffusion model (sized for a 4 GB GPU)
+  evaluate_adaptation.py fine-tuning / cleanup variants, with cross-validation over people
   make_font.py          a few drawn letters -> generated alphabet -> .ttf + preview
 webapp/
   server.py             the TULISANKU app (Flask): draw a few letters -> generated font, live preview, download
@@ -87,6 +92,7 @@ Training and evaluation (after the NIST and drawn datasets are built):
 .venv/Scripts/python scripts/evaluate_baselines.py
 .venv/Scripts/python scripts/train_gan.py --style-critic --steps 20000 --out checkpoints/gan_style   # ~70 min
 .venv/Scripts/python scripts/evaluate_gan.py checkpoints/gan_style/ema_015000.pt --name gan_style
+.venv/Scripts/python scripts/train_diffusion.py                    # ~3 h; add --resume after an interruption
 ```
 
 Making a font from a drawn session (5 letters in, 62 characters + basic punctuation out):

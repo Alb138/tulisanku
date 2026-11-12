@@ -65,6 +65,16 @@ def sample_sheet(model, writers, path, step):
     img.save(path)
 
 
+def sample_writers(val_images, val_mask):
+    """Fixed writers for the sample sheets: 4 unseen NIST writers + 4 drawn sessions (incl. the team's)."""
+    drawn, drawn_mask, drawn_meta = load_handwriting("drawn")
+    show = [(f"NIST val {i}", np.asarray(val_images[i]), val_mask[i]) for i in range(4)]
+    for session in ["27dddc07", *drawn_meta.session[drawn_meta.writer != "team-1"][:3]]:
+        i = int(drawn_meta.index[drawn_meta.session == session][0])
+        show.append((f"drawn {session}", np.asarray(drawn[i]), drawn_mask[i]))
+    return show
+
+
 def critic_loss(real_scores, fake_scores):
     """Hinge loss, averaged over the critic's heads (character, and writer with --style-critic)."""
     return sum(F.relu(1 - r).mean() + F.relu(1 + f).mean() for r, f in zip(real_scores, fake_scores)) / len(real_scores)
@@ -114,13 +124,8 @@ def main():
         start, history = ck["step"], ck["history"]
         print(f"resumed from step {start}")
 
-    # Fixed writers for the sample sheets: 4 unseen NIST writers + 4 drawn sessions (incl. the team's).
     val_images, val_mask, _ = load_handwriting("nist", "val")
-    drawn, drawn_mask, drawn_meta = load_handwriting("drawn")
-    show = [(f"NIST val {i}", np.asarray(val_images[i]), val_mask[i]) for i in range(4)]
-    for session in ["27dddc07", *drawn_meta.session[drawn_meta.writer != "team-1"][:3]]:
-        i = int(drawn_meta.index[drawn_meta.session == session][0])
-        show.append((f"drawn {session}", np.asarray(drawn[i]), drawn_mask[i]))
+    show = sample_writers(val_images, val_mask)
     run = args.out.name  # "gan" for the default run; other runs keep their own samples and history
     samples_dir = Path("outputs") / run / "samples"
     samples_dir.mkdir(parents=True, exist_ok=True)
