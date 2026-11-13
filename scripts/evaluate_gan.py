@@ -1,4 +1,4 @@
-"""Evaluate trained GAN checkpoints exactly like the baselines, plus a memorization check.
+"""Evaluate trained GAN or diffusion checkpoints exactly like the baselines, plus a memorization check.
 
 1. Memorization check ("would more data help?"): the same few-shot test on NIST writers
    the GAN trained on vs. writers it never saw. A model that memorized its training
@@ -8,6 +8,11 @@
 2. The baseline test sets (held-out fonts, NIST test writers, drawn) with the same k,
    trials and reference letters as scripts/evaluate_baselines.py, so the numbers are
    directly comparable with outputs/results/baselines_summary.csv.
+
+Diffusion checkpoints (recognized by their U-Net weights) generate with --guidance and
+--ddim-steps. Generating takes ~3 s per person (the GAN: 0.1 s), so for diffusion use e.g.
+--ks 5 --trials 1 --memorization-writers 100: trial 0 uses the same reference letters as
+trial 0 of every other model.
 
 Writes outputs/results/<name>.csv, <name>_summary.csv, <name>_memorization.csv and
        outputs/figures/<name>_examples_{nist,drawn}.png (references, truth, nearest font, GANs),
@@ -20,11 +25,13 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from evaluate_baselines import example_figure  # noqa: E402
 from tulisanku.baselines import NearestFont  # noqa: E402
 from tulisanku.data import load_fonts, load_handwriting  # noqa: E402
+from tulisanku.diffusion_model import DiffusionModel  # noqa: E402
 from tulisanku.evaluation import evaluate  # noqa: E402
 from tulisanku.gan_model import GanModel  # noqa: E402
 from tulisanku.legibility import Reader  # noqa: E402
@@ -33,10 +40,17 @@ from tulisanku.style import StyleGallery, StyleJudge  # noqa: E402
 METRICS = ["l1", "ssim", "iou", "legible", "legible_merged", "style_top1", "style_pct"]
 
 
-def load_gan(path: Path) -> GanModel:
-    model = GanModel(path)
-    run = path.parent.name.removeprefix("gan").strip("_")  # checkpoints/gan_style -> "style", checkpoints/gan -> ""
-    model.name = " ".join(filter(None, ["GAN", run, f"{int(path.stem.split('_')[-1]) // 1000}k"]))  # "GAN style 15k"
+def load_model(path: Path, guidance: float = 1.0, ddim_steps: int = 25):
+    """A GAN or diffusion checkpoint, named after its run and step: "GAN style 15k", "Diffusion 30k (g 2, 25 steps)"."""
+    step = f"{int(path.stem.split('_')[-1]) // 1000}k"
+    if "unet_ema" in torch.load(path, map_location="cpu"):
+        model = DiffusionModel(path, n_steps=ddim_steps, guidance=guidance)
+        run = path.parent.name.removeprefix("diffusion").strip("_")
+        model.name = " ".join(filter(None, ["Diffusion", run, step])) + f" (g {guidance:g}, {ddim_steps} steps)"
+    else:
+        model = GanModel(path)
+        run = path.parent.name.removeprefix("gan").strip("_")  # checkpoints/gan_style -> "style", checkpoints/gan -> ""
+        model.name = " ".join(filter(None, ["GAN", run, step]))
     return model
 
 
@@ -60,18 +74,21 @@ def main():
                         default=[Path("checkpoints/gan/ema_015000.pt"), Path("checkpoints/gan/ema_040000.pt")])
     parser.add_argument("--ks", type=int, nargs="+", default=[1, 5, 20])
     parser.add_argument("--trials", type=int, default=3)
-    parser.add_argument("--memorization-writers", type=int, default=300)
+    parser.add_argument("--memorization-writers", type=int, default=300, help="0 = skip the memorization check")
+    parser.add_argument("--guidance", type=float, default=1.0, help="diffusion only: > 1 = closer to the style")
+    parser.add_argument("--ddim-steps", type=int, default=25, help="diffusion only: denoising steps per generation")
     parser.add_argument("--name", default="gan", help="prefix of the result files, one per experiment")
     parser.add_argument("--out", type=Path, default=Path("outputs"))
     args = parser.parse_args()
     (args.out / "results").mkdir(parents=True, exist_ok=True)
     (args.out / "figures").mkdir(parents=True, exist_ok=True)
 
-    models = [load_gan(p) for p in args.checkpoints]
+    models = [load_model(p, args.guidance, args.ddim_steps) for p in args.checkpoints]
     reader, judge = Reader(), StyleJudge()
 
-    memo = memorization_check(models, reader, args.memorization_writers)
-    memo.to_csv(args.out / "results" / f"{args.name}_memorization.csv", index=False)
+    if args.memorization_writers:
+        memo = memorization_check(models, reader, args.memorization_writers)
+        memo.to_csv(args.out / "results" / f"{args.name}_memorization.csv", index=False)
 
     test_sets = {"fonts (held out)": load_fonts("test"), "NIST (high school)": load_handwriting("nist", "test"),
                  "drawn (ours)": load_handwriting("drawn")}
